@@ -63,7 +63,7 @@ if run_release "$NEW_IMAGE" "$NEW_VERSION" && verify_version "$NEW_VERSION"; the
   printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$NEW_VERSION" "$NEW_IMAGE" "${BUILD_URL:-manual}" \
     >> "$STATE_DIR/${ENVIRONMENT}.history"
   log "SUCCESS - ${NEW_VERSION} is live on http://localhost:${HOST_PORT}"
-  compose ps
+  docker ps --filter "name=^taskflow-${ENVIRONMENT}$" --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
   exit 0
 fi
 
