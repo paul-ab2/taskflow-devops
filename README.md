@@ -26,12 +26,12 @@ TaskFlow is a task-management REST API with a small web UI. It has JWT authentic
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<you>/taskflow-devops.git
+git clone https://github.com/paul-ab2/taskflow-devops.git
 cd taskflow-devops
 
 # 2. Start Jenkins, SonarQube, the registry and the monitoring stack, all configured as code.
 #    The optional user/token lets Jenkins clone a PRIVATE repo and push release tags.
-./scripts/bootstrap.sh https://github.com/<you>/taskflow-devops.git <github-user> <github-personal-access-token>
+./scripts/bootstrap.sh https://github.com/paul-ab2/taskflow-devops.git <github-user> <github-personal-access-token>
 ```
 
 The script prints every URL and the generated passwords. Secrets live in `infra/.env`, which is git-ignored.
@@ -103,11 +103,10 @@ infra/docker-compose.yml         Jenkins, SonarQube, registry, Prometheus, Grafa
 infra/jenkins/                   Jenkins image, plugins.txt, casc.yaml (Configuration as Code)
 infra/monitoring/                Prometheus config + alert rules, Alertmanager routes, Grafana dashboard
 scripts/                         bootstrap, SonarQube setup, security gate, monitoring checks, incident simulation
-docs/                            pipeline design, security report, demo script
+docs/                            pipeline design and security report
 ```
 
 More detail:
 
 * [docs/PIPELINE.md](docs/PIPELINE.md): stage-by-stage design decisions
 * [docs/SECURITY-REPORT.md](docs/SECURITY-REPORT.md): vulnerability findings and how each was handled
-* [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md): a plan for the 10-minute demo video
