@@ -71,8 +71,10 @@ function createApp(overrides = {}) {
   app.use(express.json({ limit: '100kb' }));
   app.use(metricsMiddleware(metrics));
 
-  app.use(healthRoutes({ config, metrics, lifecycle }));
+  // Fault injection runs before every /api route (including /api/version) so an
+  // incident simulation affects real API traffic; /health and /metrics stay untouched.
   app.use('/api', chaos.middleware());
+  app.use(healthRoutes({ config, metrics, lifecycle }));
   app.use('/api/auth', authRoutes({ authService, config }));
   app.use('/api/tasks', taskRoutes({ taskService, authService }));
   app.use('/api/admin', adminRoutes({ config, chaos }));

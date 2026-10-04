@@ -94,6 +94,9 @@ describe('Chaos / incident-simulation endpoints', () => {
     const failed = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' }).expect(500);
     expect(failed.body.error.code).toBe('CHAOS_INJECTED');
     await request(app).get('/health').expect(200); // health is outside /api so stays green
+    // the endpoint the incident simulation uses for traffic must be affected too
+    const version = await request(app).get('/api/version').expect(500);
+    expect(version.body.error.code).toBe('CHAOS_INJECTED');
 
     const metrics = await request(app).get('/metrics');
     expect(metrics.text).toMatch(/taskflow_chaos_active\{mode="errors"[^}]*\} 1/);
