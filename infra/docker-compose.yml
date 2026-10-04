@@ -42,6 +42,9 @@ services:
       GIT_REPO_URL: ${GIT_REPO_URL}
       GITHUB_USER: ${GITHUB_USER:-none}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-none}
+      # Memory-tuned for an 8 GB laptop: cap the Jenkins JVM heap
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false -Xms256m -Xmx768m"
+    mem_limit: 2560m
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
@@ -52,6 +55,7 @@ services:
     image: postgres:16-alpine
     container_name: sonar-db
     restart: unless-stopped
+    mem_limit: 256m
     environment:
       POSTGRES_USER: sonar
       POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD}
@@ -81,6 +85,11 @@ services:
       SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD}
       # Avoids the vm.max_map_count requirement of the embedded Elasticsearch on Docker Desktop
       SONAR_SEARCH_JAVAADDITIONALOPTS: "-Dnode.store.allow_mmap=false"
+      # Memory-tuned for an 8 GB laptop (defaults are 512m each)
+      SONAR_WEB_JAVAOPTS: "-Xms128m -Xmx384m"
+      SONAR_CE_JAVAOPTS: "-Xms128m -Xmx384m"
+      SONAR_SEARCH_JAVAOPTS: "-Xms384m -Xmx384m"
+    mem_limit: 2g
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
@@ -92,6 +101,7 @@ services:
     image: registry:2
     container_name: registry
     restart: unless-stopped
+    mem_limit: 128m
     ports:
       - "5001:5000"
     environment:
@@ -105,10 +115,11 @@ services:
     image: prom/prometheus:v3.5.0
     container_name: prometheus
     restart: unless-stopped
+    mem_limit: 384m
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.time=7d
       - --web.enable-lifecycle
     ports:
       - "9090:9090"
@@ -122,6 +133,7 @@ services:
     image: prom/alertmanager:v0.28.1
     container_name: alertmanager
     restart: unless-stopped
+    mem_limit: 96m
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -137,6 +149,7 @@ services:
     image: prom/blackbox-exporter:v0.26.0
     container_name: blackbox
     restart: unless-stopped
+    mem_limit: 64m
     command:
       - --config.file=/etc/blackbox/blackbox.yml
     volumes:
@@ -148,6 +161,7 @@ services:
     image: grafana/grafana:12.0.2
     container_name: grafana
     restart: unless-stopped
+    mem_limit: 256m
     ports:
       - "3000:3000"
     environment:
@@ -166,6 +180,7 @@ services:
     image: axllent/mailpit:latest
     container_name: mailpit
     restart: unless-stopped
+    mem_limit: 96m
     ports:
       - "8025:8025"
     networks: [devops-net]

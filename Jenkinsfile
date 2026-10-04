@@ -129,7 +129,8 @@ EOF
               -Dsonar.host.url="$SONAR_HOST_URL" \
               -Dsonar.token="$SONAR_AUTH_TOKEN" \
               -Dsonar.projectVersion="$APP_VERSION" \
-              -Dsonar.scm.revision="$GIT_COMMIT"
+              -Dsonar.scm.revision="$GIT_COMMIT" \
+              -Dsonar.scanner.javaOpts=-Xmx512m
           '''
           sh 'bash scripts/sonar-report.sh "$SONAR_PROJECT"'
         }

@@ -16,7 +16,7 @@
     "test": "jest",
     "test:unit": "jest --selectProjects unit",
     "test:integration": "jest --selectProjects integration",
-    "test:ci": "jest --ci --coverage",
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
     "test:smoke": "jest --config jest.smoke.config.js --ci",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "sonar": "sonar-scanner-npm"
