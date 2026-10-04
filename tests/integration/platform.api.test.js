@@ -42,6 +42,9 @@ describe('Operational endpoints', () => {
     expect(res.headers['x-powered-by']).toBeUndefined();
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['content-security-policy']).toBeDefined();
+    // Served over plain HTTP: browsers must not be told to upgrade asset requests to HTTPS
+    expect(res.headers['content-security-policy']).not.toMatch(/upgrade-insecure-requests/);
+    expect(res.headers['strict-transport-security']).toBeUndefined();
   });
 
   it('propagates or generates a request id', async () => {

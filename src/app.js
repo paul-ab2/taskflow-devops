@@ -60,7 +60,13 @@ function createApp(overrides = {}) {
     },
     autoLogging: { ignore: (req) => ['/health', '/ready', '/metrics'].includes(req.url) },
   }));
-  app.use(helmet());
+  // The app is served over plain HTTP (TLS would be terminated by a reverse proxy in a
+  // real deployment), so the HTTPS-only defaults are switched off: with
+  // upgrade-insecure-requests Safari rewrites /styles.css and /app.js to https:// and the UI breaks.
+  app.use(helmet({
+    contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } },
+    strictTransportSecurity: false,
+  }));
   app.use(compression());
   app.use(express.json({ limit: '100kb' }));
   app.use(metricsMiddleware(metrics));
