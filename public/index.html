@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TaskFlow</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">TaskFlow</div>
+    <div class="build" id="build">loading build info…</div>
+    <button id="logout" class="ghost hidden" type="button">Log out</button>
+  </header>
+
+  <main>
+    <section id="auth" class="card narrow">
+      <h1>Welcome</h1>
+      <p class="muted">Sign in or create an account to manage your tasks.</p>
+      <form id="auth-form">
+        <label class="hidden" id="name-row">Name <input name="name" autocomplete="name"></label>
+        <label>Email <input name="email" type="email" required autocomplete="email"></label>
+        <label>Password <input name="password" type="password" required minlength="8" autocomplete="current-password"></label>
+        <p class="hint">At least 8 characters, including a letter and a number.</p>
+        <div class="row">
+          <button type="submit" id="auth-submit">Log in</button>
+          <button type="button" class="ghost" id="toggle-mode">Create an account</button>
+        </div>
+        <p class="error" id="auth-error" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="board" class="hidden">
+      <div class="stats" id="stats"></div>
+
+      <form id="task-form" class="card">
+        <input name="title" placeholder="What needs doing?" required maxlength="200">
+        <select name="priority" aria-label="Priority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <input name="dueDate" type="date" aria-label="Due date">
+        <button type="submit">Add task</button>
+      </form>
+
+      <div class="filters">
+        <select id="filter-status" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option value="todo">To do</option>
+          <option value="in_progress">In progress</option>
+          <option value="done">Done</option>
+        </select>
+        <input id="filter-search" placeholder="Search…" aria-label="Search tasks">
+      </div>
+
+      <ul id="tasks" class="tasks"></ul>
+      <p class="muted center" id="empty">No tasks yet.</p>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

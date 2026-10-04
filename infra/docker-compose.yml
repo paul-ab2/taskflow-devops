@@ -1,0 +1,187 @@
+# ---------------------------------------------------------------------------
+# DevOps platform - everything the pipeline needs, as code.
+#   docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
+# (scripts/bootstrap.sh does this for you, including the SonarQube token)
+#
+#  Jenkins ........ http://localhost:8080   CI/CD server (configured by JCasC)
+#  SonarQube ...... http://localhost:9000   code quality + quality gate
+#  Registry ....... http://localhost:5001   versioned Docker image storage
+#  Prometheus ..... http://localhost:9090   metrics + alert rules
+#  Alertmanager ... http://localhost:9093   alert routing / notification
+#  Grafana ........ http://localhost:3000   dashboards
+#  Mailpit ........ http://localhost:8025   team inbox that receives alert e-mails
+#  (staging app http://localhost:8001 and production app http://localhost:8000
+#   are deployed by the pipeline from deploy/docker-compose.yml)
+# ---------------------------------------------------------------------------
+name: taskflow-devops
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  jenkins:
+    build: ./jenkins
+    image: taskflow-jenkins:local
+    container_name: jenkins
+    # Root is required ONLY to access the host Docker socket in this local lab.
+    user: root
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD}
+      SONAR_TOKEN: ${SONAR_TOKEN}
+      STAGING_JWT_SECRET: ${STAGING_JWT_SECRET}
+      PROD_JWT_SECRET: ${PROD_JWT_SECRET}
+      CHAOS_TOKEN: ${CHAOS_TOKEN}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GIT_REPO_URL: ${GIT_REPO_URL}
+      GITHUB_USER: ${GITHUB_USER:-none}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-none}
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [devops-net]
+    logging: *default-logging
+
+  sonar-db:
+    image: postgres:16-alpine
+    container_name: sonar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD}
+      POSTGRES_DB: sonar
+    volumes:
+      - sonar_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [devops-net]
+    logging: *default-logging
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    restart: unless-stopped
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD}
+      # Avoids the vm.max_map_count requirement of the embedded Elasticsearch on Docker Desktop
+      SONAR_SEARCH_JAVAADDITIONALOPTS: "-Dnode.store.allow_mmap=false"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks: [devops-net]
+    logging: *default-logging
+
+  registry:
+    image: registry:2
+    container_name: registry
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry_data:/var/lib/registry
+    networks: [devops-net]
+    logging: *default-logging
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    networks: [devops-net]
+    logging: *default-logging
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager:ro
+      - alertmanager_data:/alertmanager
+    networks: [devops-net]
+    logging: *default-logging
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.26.0
+    container_name: blackbox
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./monitoring/blackbox:/etc/blackbox:ro
+    networks: [devops-net]
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/taskflow.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks: [devops-net]
+    logging: *default-logging
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+    networks: [devops-net]
+    logging: *default-logging
+
+networks:
+  devops-net:
+    name: devops-net
+
+volumes:
+  jenkins_home:
+  sonar_db:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  registry_data:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:

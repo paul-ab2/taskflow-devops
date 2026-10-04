@@ -1,0 +1,60 @@
+# Prometheus scrape + alerting configuration (reloaded by the Monitoring stage via /-/reload)
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+  external_labels:
+    monitor: taskflow
+
+rule_files:
+  - /etc/prometheus/alert.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # Application metrics (RED + business + Node.js runtime) from /metrics
+  - job_name: taskflow-production
+    static_configs:
+      - targets: ["taskflow-production:3000"]
+        labels:
+          environment: production
+
+  - job_name: taskflow-staging
+    static_configs:
+      - targets: ["taskflow-staging:3000"]
+        labels:
+          environment: staging
+
+  # Black-box uptime probes: checks /health exactly like an external user would
+  - job_name: blackbox-health
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ["http://taskflow-production:3000/health"]
+        labels:
+          environment: production
+      - targets: ["http://taskflow-staging:3000/health"]
+        labels:
+          environment: staging
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  # The CI/CD server itself (Jenkins Prometheus plugin) - lets us alert on failing pipelines
+  - job_name: jenkins
+    metrics_path: /prometheus/
+    static_configs:
+      - targets: ["jenkins:8080"]
+        labels:
+          environment: ci
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# Alertmanager routing: critical production alerts page the on-call engineer,
+# everything else goes to the team inbox. Both are delivered as e-mail to
+# Mailpit (http://localhost:8025) so the whole alert path can be demonstrated
+# locally. Swap email_configs for slack_configs / pagerduty_configs in a real team.
+# ---------------------------------------------------------------------------
+global:
+  smtp_smarthost: "mailpit:1025"
+  smtp_from: "alertmanager@taskflow.local"
+  smtp_require_tls: false
+  resolve_timeout: 5m
+
+route:
+  receiver: team-email
+  group_by: ["alertname", "environment"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 2h
+  routes:
+    - matchers: ['severity="critical"']
+      receiver: oncall-critical
+      group_wait: 5s
+    - matchers: ['severity="info"']
+      receiver: team-email
+      repeat_interval: 12h
+
+receivers:
+  - name: team-email
+    email_configs:
+      - to: "devops-team@taskflow.local"
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.environment }})'
+
+  - name: oncall-critical
+    email_configs:
+      - to: "oncall@taskflow.local, devops-team@taskflow.local"
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}][CRITICAL] {{ .CommonLabels.alertname }} ({{ .CommonLabels.environment }})'
+
+# If production is completely down, don't also spam latency/error-rate warnings.
+inhibit_rules:
+  - source_matchers: ['alertname="TaskFlowProductionDown"']
+    target_matchers: ['severity="warning"', 'environment="production"']

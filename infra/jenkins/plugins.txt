@@ -1,0 +1,29 @@
+# Core pipeline
+workflow-aggregator
+pipeline-stage-view
+pipeline-graph-view
+pipeline-utility-steps
+git
+github
+credentials-binding
+
+# Configuration as code
+configuration-as-code
+job-dsl
+
+# Build hygiene
+timestamper
+ansicolor
+ws-cleanup
+build-timeout
+
+# Test & quality reporting
+junit
+coverage
+warnings-ng
+htmlpublisher
+sonar
+
+# Notifications & monitoring
+mailer
+prometheus

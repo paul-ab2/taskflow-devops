@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# Application environment definition (infrastructure as code).
+# One file, two environments: deploy/deploy.sh sets APP_ENV=staging|production,
+# picks the matching env/<APP_ENV>.env file and injects secrets from Jenkins
+# credentials. The SAME immutable image is promoted from staging to production.
+# ---------------------------------------------------------------------------
+services:
+  app:
+    image: ${IMAGE:?IMAGE is required}
+    container_name: taskflow-${APP_ENV:?APP_ENV is required}
+    restart: unless-stopped
+    env_file:
+      - env/${APP_ENV}.env
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_VERSION: ${APP_VERSION:?APP_VERSION is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CHAOS_TOKEN: ${CHAOS_TOKEN:-}
+    ports:
+      - "${HOST_PORT:?HOST_PORT is required}:3000"
+    labels:
+      com.taskflow.environment: ${APP_ENV}
+      com.taskflow.version: ${APP_VERSION}
+    # Runtime hardening
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [devops-net]
+
+networks:
+  devops-net:
+    external: true

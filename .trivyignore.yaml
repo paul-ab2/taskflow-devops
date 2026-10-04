@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------------------
+# Trivy accepted-risk register (used by the Security stage via --ignorefile).
+#
+# Policy:
+#  * A finding may only be suppressed here after triage, with a written
+#    statement explaining why it is not exploitable or why the risk is accepted.
+#  * Suppressions should be scoped with `paths` and given an `expired_at` date so
+#    they are re-reviewed instead of silently living forever.
+#  * Everything suppressed here must also be listed in docs/SECURITY-REPORT.md.
+#
+# Example entry (kept as documentation of the format):
+#
+# vulnerabilities:
+#   - id: CVE-0000-00000
+#     paths:
+#       - "usr/local/lib/node_modules/example/package.json"
+#     statement: "Dev-only tool, not reachable from the HTTP API"
+#     expired_at: 2027-01-31
+# ---------------------------------------------------------------------------
+vulnerabilities: []
+misconfigurations: []
+secrets: []

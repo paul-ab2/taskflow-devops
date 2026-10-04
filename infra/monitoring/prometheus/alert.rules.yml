@@ -1,0 +1,146 @@
+# ---------------------------------------------------------------------------
+# Alert rules. Each rule has a severity (routing in Alertmanager), a summary,
+# a description with the live value, and a runbook hint so whoever is paged
+# knows what to do first.
+# `for:` windows are deliberately short so the incident simulation in the
+# Monitoring stage completes within a few minutes; production systems would
+# typically use 5m+ to avoid flapping.
+# ---------------------------------------------------------------------------
+groups:
+  - name: taskflow-availability
+    rules:
+      - alert: TaskFlowProductionDown
+        expr: up{job="taskflow-production"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          environment: production
+        annotations:
+          summary: "TaskFlow production is DOWN"
+          description: "Prometheus cannot scrape {{ $labels.instance }} for more than 30s."
+          runbook: "docker ps -a | grep taskflow-production; docker logs taskflow-production; roll back with deploy/rollback.sh production"
+
+      - alert: TaskFlowHealthCheckFailing
+        expr: probe_success{job="blackbox-health", environment="production"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          environment: production
+        annotations:
+          summary: "Production /health probe failing"
+          description: "Black-box probe of {{ $labels.instance }} has failed for 1 minute."
+          runbook: "Check container health status and recent deployments in Grafana annotations."
+
+      - alert: TaskFlowStagingDown
+        expr: up{job="taskflow-staging"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          environment: staging
+        annotations:
+          summary: "TaskFlow staging is down"
+          description: "Staging has not been scrapeable for 2 minutes - the next pipeline run will redeploy it."
+          runbook: "Re-run the pipeline or docker start taskflow-staging"
+
+  - name: taskflow-golden-signals
+    rules:
+      - alert: TaskFlowHighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="taskflow-production", status_code=~"5.."}[1m]))
+            /
+            sum(rate(http_requests_total{job="taskflow-production"}[1m]))
+          ) > 0.05
+        for: 30s
+        labels:
+          severity: critical
+          environment: production
+        annotations:
+          summary: "High 5xx error rate in production"
+          description: "{{ $value | humanizePercentage }} of production requests are failing (threshold 5%)."
+          runbook: "Check logs (docker logs taskflow-production), recent release, and /api/admin/chaos status."
+
+      - alert: TaskFlowHighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{job="taskflow-production", route!="unmatched"}[1m]))
+          ) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+          environment: production
+        annotations:
+          summary: "Production p95 latency above 500ms"
+          description: "p95 latency is {{ $value | humanizeDuration }} (SLO 500ms)."
+          runbook: "Check CPU/memory/event-loop panels in Grafana; look for a slow route in the latency-by-route panel."
+
+      - alert: TaskFlowEventLoopLag
+        expr: nodejs_eventloop_lag_p99_seconds{job="taskflow-production"} > 0.2
+        for: 2m
+        labels:
+          severity: warning
+          environment: production
+        annotations:
+          summary: "Node.js event loop is blocked"
+          description: "p99 event-loop lag is {{ $value | humanizeDuration }}."
+          runbook: "A CPU-heavy request is blocking the event loop - profile the latest release."
+
+  - name: taskflow-resources
+    rules:
+      - alert: TaskFlowHighMemory
+        expr: process_resident_memory_bytes{job="taskflow-production"} > 200 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+          environment: production
+        annotations:
+          summary: "Production memory above 200MB (container limit 256MB)"
+          description: "RSS is {{ $value | humanize1024 }}B - risk of OOM kill."
+          runbook: "Look for a memory leak in the latest release; restart restores service."
+
+      - alert: TaskFlowHighCpu
+        expr: rate(process_cpu_seconds_total{job="taskflow-production"}[2m]) > 0.4
+        for: 5m
+        labels:
+          severity: warning
+          environment: production
+        annotations:
+          summary: "Production CPU above 80% of its 0.5 CPU limit"
+          description: "CPU usage is {{ $value | humanize }} cores."
+          runbook: "Check request rate - scale out or optimise the hot route."
+
+  - name: taskflow-security
+    rules:
+      - alert: TaskFlowAuthFailureSpike
+        expr: sum(rate(taskflow_auth_failures_total{job="taskflow-production"}[5m])) * 60 > 30
+        for: 2m
+        labels:
+          severity: warning
+          environment: production
+        annotations:
+          summary: "Spike in failed logins (possible brute-force attack)"
+          description: "{{ $value | humanize }} failed authentications per minute."
+          runbook: "Check source IPs in logs; rate limiter returns 429 after 20 attempts per 15 min."
+
+  - name: taskflow-delivery
+    rules:
+      - alert: TaskFlowChaosExperimentActive
+        expr: max(taskflow_chaos_active{job="taskflow-production"}) == 1
+        labels:
+          severity: info
+          environment: production
+        annotations:
+          summary: "A chaos / incident-simulation experiment is running in production"
+          description: "Fault injection is active - related alerts are expected."
+          runbook: "Disable with POST /api/admin/chaos {\"mode\":\"off\"} or wait for auto-expiry."
+
+      - alert: TaskFlowPipelineFailing
+        expr: default_jenkins_builds_last_build_result_ordinal{jenkins_job="taskflow-pipeline"} == 2
+        for: 1m
+        labels:
+          severity: warning
+          environment: ci
+        annotations:
+          summary: "The TaskFlow Jenkins pipeline's last build failed"
+          description: "Fix the build before the next release - see Jenkins console output."
+          runbook: "http://localhost:8080/job/taskflow-pipeline/lastBuild/console"
