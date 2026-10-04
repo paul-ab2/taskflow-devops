@@ -67,8 +67,8 @@ function createBusinessMetrics(register) {
 }
 
 /** Gauges computed at scrape time from the repositories. */
-function registerStateGauges(register, { taskRepository, userRepository }) {
-  new client.Gauge({
+function createStateGauges(register, { taskRepository, userRepository }) {
+  const tasksCurrent = new client.Gauge({
     name: 'taskflow_tasks_current',
     help: 'Tasks currently stored, by status',
     labelNames: ['status'],
@@ -80,7 +80,7 @@ function registerStateGauges(register, { taskRepository, userRepository }) {
     },
   });
 
-  new client.Gauge({
+  const usersCurrent = new client.Gauge({
     name: 'taskflow_users_current',
     help: 'Users currently registered',
     registers: [register],
@@ -88,6 +88,8 @@ function registerStateGauges(register, { taskRepository, userRepository }) {
       if (userRepository) this.set(await userRepository.count());
     },
   });
+
+  return { tasksCurrent, usersCurrent };
 }
 
 function createMetrics({ appEnv, version, commit, taskRepository, userRepository }) {
@@ -95,7 +97,7 @@ function createMetrics({ appEnv, version, commit, taskRepository, userRepository
   register.setDefaultLabels({ app: 'taskflow-api', env: appEnv });
   client.collectDefaultMetrics({ register });
 
-  registerStateGauges(register, { taskRepository, userRepository });
+  const stateGauges = createStateGauges(register, { taskRepository, userRepository });
 
   const appInfo = new client.Gauge({
     name: 'taskflow_app_info',
@@ -105,7 +107,13 @@ function createMetrics({ appEnv, version, commit, taskRepository, userRepository
   });
   appInfo.set({ version, commit }, 1);
 
-  return { register, ...createHttpMetrics(register), ...createBusinessMetrics(register) };
+  return {
+    register,
+    appInfo,
+    ...stateGauges,
+    ...createHttpMetrics(register),
+    ...createBusinessMetrics(register),
+  };
 }
 
 module.exports = { createMetrics };

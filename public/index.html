@@ -34,7 +34,8 @@
       <div class="stats" id="stats"></div>
 
       <form id="task-form" class="card">
-        <input name="title" placeholder="What needs doing?" required maxlength="200">
+        <label for="task-title" class="sr-only">Task title</label>
+        <input id="task-title" name="title" placeholder="What needs doing?" required maxlength="200">
         <select name="priority" aria-label="Priority">
           <option value="low">Low</option>
           <option value="medium" selected>Medium</option>
